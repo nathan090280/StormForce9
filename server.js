@@ -58,7 +58,17 @@ app.get('/scores', async (req, res) => {
   try {
     const snap = await db.ref('/scores').get();
     const data = snap.exists() ? snap.val() : {};
-    res.json({ scores: Object.values(data) });
+    const scores = Object.values(data);
+    
+    // Sort by fastest time (lowest value) for current course
+    const course = req.query.course || 'c1';
+    scores.sort((a, b) => {
+      const aTime = a[course] || Infinity;
+      const bTime = b[course] || Infinity;
+      return aTime - bTime;
+    });
+    
+    res.json({ scores });
   } catch (e) {
     console.error('[ERR] list scores', e);
     res.status(500).json({ error: 'Failed to load scores' });
