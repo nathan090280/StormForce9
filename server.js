@@ -2,7 +2,7 @@
 // Env vars required on Render:
 // - SCOREBOARD_API_KEY  (client must send in header x-api-key)
 // - FIREBASE_DATABASE_URL (e.g. https://<project>-default-rtdb.firebaseio.com)
-// - FIREBASE_SERVICE_ACCOUNT (entire JSON from Firebase Admin SDK, one-line string with \\n preserved)
+// - FIREBASE_SERVICE_ACCOUNT (entire JSON from Firebase Admin SDK, one-line string with \n preserved)
 
 const express = require('express');
 const cors = require('cors');
@@ -18,19 +18,21 @@ if (!SERVICE_ACCOUNT_JSON) {
   process.exit(1);
 }
 
-// Initialize Firebase Admin using service account with \n fixed
+// Initialize Firebase Admin using service account
 if (!admin.apps.length) {
   try {
-    const serviceAccount = JSON.parse(
-      SERVICE_ACCOUNT_JSON.replace(/\\n/g, '\n')
-    );
+    // Parse single-line JSON safely
+    const serviceAccount = JSON.parse(SERVICE_ACCOUNT_JSON);
+
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       databaseURL: FB_DB_URL,
     });
+
     console.log('[OK] Firebase initialized with service account');
   } catch (e) {
     console.error('[ERR] Firebase init failed:', e.message);
+    console.error('[ERR] Did you paste the SERVICE_ACCOUNT JSON as a single line with proper \\n escapes?');
     process.exit(1);
   }
 }
