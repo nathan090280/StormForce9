@@ -3,6 +3,7 @@
 // - SCOREBOARD_API_KEY  (client must send in header x-api-key)
 // - FIREBASE_DATABASE_URL (e.g. https://<project>-default-rtdb.firebaseio.com)
 // - FIREBASE_SERVICE_ACCOUNT (entire JSON from Firebase Admin SDK, one-line string with \n preserved)
+// - CORS_ORIGINS (comma-separated list of allowed domains, e.g. https://yourgame.itch.io,https://yourgame.netlify.app)
 
 const express = require('express');
 const cors = require('cors');
@@ -12,6 +13,7 @@ const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.SCOREBOARD_API_KEY || '';
 const FB_DB_URL = process.env.FIREBASE_DATABASE_URL;
 const SERVICE_ACCOUNT_JSON = process.env.FIREBASE_SERVICE_ACCOUNT;
+const CORS_ORIGINS = process.env.CORS_ORIGINS || '';
 
 if (!SERVICE_ACCOUNT_JSON) {
   console.error('[ERR] Missing FIREBASE_SERVICE_ACCOUNT env var');
@@ -21,7 +23,6 @@ if (!SERVICE_ACCOUNT_JSON) {
 // Initialize Firebase Admin using service account
 if (!admin.apps.length) {
   try {
-    // Parse single-line JSON safely
     const serviceAccount = JSON.parse(SERVICE_ACCOUNT_JSON);
 
     admin.initializeApp({
@@ -39,7 +40,20 @@ if (!admin.apps.length) {
 
 const db = admin.database();
 const app = express();
-app.use(cors());
+
+// ✅ Improved CORS setup
+const allowedOrigins = CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn('[WARN] Blocked CORS request from:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+}));
+
 app.use(express.json());
 
 // Middleware: require API key
@@ -117,4 +131,4 @@ app.post('/scores/submit', requireApiKey, async (req, res) => {
 // Fallback
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 
-app.listen(PORT, () => console.log('Scoreboard server listening on :' + PORT));
+app.listen(PORT, () => console.log('⚓ Scoreboard server listening on :' + PORT));
