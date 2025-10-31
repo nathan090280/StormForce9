@@ -60,12 +60,14 @@ app.get('/scores', async (req, res) => {
     const data = snap.exists() ? snap.val() : {};
     const scores = Object.values(data);
     
-    // Sort by fastest time (lowest value) for current course
+    // Sort by time for current course (default: course 1, fastest first)
     const course = req.query.course || 'c1';
+    const sortDir = req.query.dir === 'desc' ? -1 : 1;
+    
     scores.sort((a, b) => {
       const aTime = a[course] || Infinity;
       const bTime = b[course] || Infinity;
-      return aTime - bTime;
+      return sortDir * (aTime - bTime);
     });
     
     res.json({ scores });
