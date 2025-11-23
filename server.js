@@ -41,18 +41,24 @@ if (!admin.apps.length) {
 const db = admin.database();
 const app = express();
 
-// ✅ Improved CORS setup
+// ✅ Improved CORS setup (allow explicit origins, methods, and headers incl. x-api-key)
 const allowedOrigins = CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.warn('[WARN] Blocked CORS request from:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
+const corsOptionsDelegate = function (origin, callback) {
+  const isAllowed = !origin || allowedOrigins.includes(origin);
+  const opts = {
+    origin: isAllowed,
+    methods: ['GET','POST','OPTIONS'],
+    allowedHeaders: ['Content-Type','x-api-key'],
+    optionsSuccessStatus: 204
+  };
+  if (!isAllowed && origin) {
+    console.warn('[WARN] Blocked CORS request from:', origin);
   }
-}));
+  callback(null, opts);
+};
+app.use(cors(corsOptionsDelegate));
+// Preflight for all routes
+app.options('*', cors(corsOptionsDelegate));
 
 app.use(express.json({ limit: '1mb' }));
 
