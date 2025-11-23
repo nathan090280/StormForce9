@@ -188,6 +188,36 @@ app.post('/replays/submit', requireApiKey, async (req, res) => {
   }
 });
 
+// Admin: migrate existing replays to set device where missing
+app.post('/replays/migrate-device', requireApiKey, async (req, res) => {
+  try {
+    const targetDevice = ['desktop','mobile-p','mobile-l'].includes(String(req.body?.device)) ? String(req.body.device) : 'desktop';
+    const course = req.body?.course; // optional: 'c1'..'c5'; if omitted, migrate all
+    const courses = course ? [String(course)] : ['c1','c2','c3','c4','c5'];
+    let updated = 0, scanned = 0;
+    for (const c of courses) {
+      const ref = db.ref(`/replays/${c}`);
+      const snap = await ref.get();
+      if (!snap.exists()) continue;
+      const entries = snap.val();
+      const updates = {};
+      for (const [k, v] of Object.entries(entries)) {
+        scanned++;
+        if (!v || v.device) continue;
+        updates[`${k}/device`] = targetDevice;
+        updated++;
+      }
+      if (Object.keys(updates).length) {
+        await ref.update(updates);
+      }
+    }
+    res.json({ ok: true, updated, scanned, device: targetDevice, courses });
+  } catch (e) {
+    console.error('[ERR] migrate-device', e);
+    res.status(500).json({ error: 'Migration failed' });
+  }
+});
+
 // Fallback
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 
