@@ -140,10 +140,14 @@ app.post('/scores/submit', requireApiKey, async (req, res) => {
 app.get('/replays', async (req, res) => {
   try {
     const course = String(req.query.course || 'c1');
+    const device = req.query.device ? String(req.query.device) : undefined; // 'desktop' | 'mobile-p' | 'mobile-l'
     const snap = await db.ref(`/replays/${course}`).get();
     const val = snap.exists() ? snap.val() : {};
     // flatten to array
-    const list = Object.values(val);
+    let list = Object.values(val);
+    if (device) {
+      list = list.filter(x => x && x.device === device);
+    }
     res.json({ replays: Array.isArray(list) ? list : [] });
   } catch (e) {
     console.error('[ERR] get replays', e);
@@ -154,7 +158,7 @@ app.get('/replays', async (req, res) => {
 // Submit a replay (requires API key)
 app.post('/replays/submit', requireApiKey, async (req, res) => {
   try {
-    const { course, duration, samples } = req.body || {};
+    const { course, duration, samples, device } = req.body || {};
     const c = String(course || 'c1');
     if (!Array.isArray(samples) || samples.length === 0) {
       return res.status(400).json({ error: 'Invalid samples' });
@@ -162,6 +166,7 @@ app.post('/replays/submit', requireApiKey, async (req, res) => {
     const item = {
       duration: Number(duration) || 0,
       samples: samples.map(s => ({ t: Number(s.t)||0, rudder: Number(s.rudder)||0, sail: Number(s.sail)||0 })),
+      device: ['desktop','mobile-p','mobile-l'].includes(String(device)) ? String(device) : 'desktop',
       savedAt: Date.now()
     };
     const ref = db.ref(`/replays/${c}`);
