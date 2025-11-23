@@ -128,6 +128,54 @@ app.post('/scores/submit', requireApiKey, async (req, res) => {
   }
 });
 
+// === Replays API ===
+// Get replays for a course (public GET)
+app.get('/replays', async (req, res) => {
+  try {
+    const course = String(req.query.course || 'c1');
+    const snap = await db.ref(`/replays/${course}`).get();
+    const val = snap.exists() ? snap.val() : {};
+    // flatten to array
+    const list = Object.values(val);
+    res.json({ replays: Array.isArray(list) ? list : [] });
+  } catch (e) {
+    console.error('[ERR] get replays', e);
+    res.status(500).json({ error: 'Failed to load replays' });
+  }
+});
+
+// Submit a replay (requires API key)
+app.post('/replays/submit', requireApiKey, async (req, res) => {
+  try {
+    const { course, duration, samples } = req.body || {};
+    const c = String(course || 'c1');
+    if (!Array.isArray(samples) || samples.length === 0) {
+      return res.status(400).json({ error: 'Invalid samples' });
+    }
+    const item = {
+      duration: Number(duration) || 0,
+      samples: samples.map(s => ({ t: Number(s.t)||0, rudder: Number(s.rudder)||0, sail: Number(s.sail)||0 })),
+      savedAt: Date.now()
+    };
+    const ref = db.ref(`/replays/${c}`);
+    const pushed = await ref.push(item);
+    // trim to last 25
+    const snap = await ref.get();
+    if (snap.exists()){
+      const entries = Object.entries(snap.val());
+      if(entries.length > 25){
+        const sorted = entries.sort((a,b)=> (a[1].savedAt||0)-(b[1].savedAt||0));
+        const toDelete = sorted.slice(0, entries.length-25);
+        await Promise.all(toDelete.map(([k])=> ref.child(k).remove()));
+      }
+    }
+    res.json({ ok: true, id: pushed.key });
+  } catch (e) {
+    console.error('[ERR] submit replay', e);
+    res.status(500).json({ error: 'Failed to submit replay' });
+  }
+});
+
 // Fallback
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 
