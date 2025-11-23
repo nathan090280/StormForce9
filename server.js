@@ -43,7 +43,8 @@ const app = express();
 
 // ✅ Improved CORS setup (allow explicit origins, methods, and headers incl. x-api-key)
 const allowedOrigins = CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
-const corsOptionsDelegate = function (origin, callback) {
+const corsOptionsDelegate = function (req, callback) {
+  const origin = req.headers && req.headers.origin;
   const isAllowed = !origin || allowedOrigins.includes(origin);
   const opts = {
     origin: isAllowed,
