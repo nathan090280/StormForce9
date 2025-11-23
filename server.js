@@ -41,6 +41,27 @@ if (!admin.apps.length) {
 const db = admin.database();
 const app = express();
 
+// One-time startup migration: ensure legacy replays get a device tag ('desktop')
+async function migrateLegacyReplaysToDesktop(){
+  try{
+    const courses = ['c1','c2','c3','c4','c5'];
+    let updated = 0, scanned = 0;
+    for(const c of courses){
+      const ref = db.ref(`/replays/${c}`);
+      const snap = await ref.get();
+      if(!snap.exists()) continue;
+      const entries = snap.val();
+      const updates = {};
+      for(const [k,v] of Object.entries(entries)){
+        scanned++;
+        if(v && !v.device){ updates[`${k}/device`] = 'desktop'; updated++; }
+      }
+      if(Object.keys(updates).length){ await ref.update(updates); }
+    }
+    if(updated>0) console.log(`[OK] Migrated legacy replays: updated ${updated}/${scanned}`);
+  }catch(e){ console.warn('[WARN] Startup replay device migration failed:', e.message); }
+}
+
 // ✅ Improved CORS setup (allow explicit origins, methods, and headers incl. x-api-key)
 const allowedOrigins = CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
 const corsOptionsDelegate = function (req, callback) {
@@ -220,5 +241,8 @@ app.post('/replays/migrate-device', requireApiKey, async (req, res) => {
 
 // Fallback
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
+
+// Kick off legacy migration (non-blocking)
+migrateLegacyReplaysToDesktop();
 
 app.listen(PORT, () => console.log('⚓ Scoreboard server listening on :' + PORT));
